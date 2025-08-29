@@ -1,40 +1,73 @@
-// api/proxy.js
-export default async function handler(req, res) {
-  const SUPERTONE_BASE = "https://api.supertoneapi.com/v1";
-  const key = process.env.SUPERTONE_API_KEY;
-  const { op = "", callback } = req.query || {};
+const fetch = require('node-fetch');
 
-  const jsonp = (data, status = 200) => {
-    const body = callback ? `${callback}(${JSON.stringify(data)});` : JSON.stringify(data);
-    res.status(status);
-    res.setHeader("Content-Type", callback ? "application/javascript; charset=utf-8" : "application/json; charset=utf-8");
-    res.send(body);
-  };
+module.exports = async (req, res) => {
+    // 1. 클라이언트가 보낸 쿼리 파라미터 가져오기
+    const { op, voiceId, text, language, style, model, output } = req.query;
 
-  if (!key) return jsonp({ error: true, message: "missing SUPERTONE_API_KEY" }, 500);
+    // 2. Supertone API의 기본 URL
+    const baseUrl = 'https://api.supertone.io/v1';
+    let apiUrl;
 
-  const headers = {
-    "Authorization": `Bearer ${key}`,
-    "x-sup-api-key": key,
-    "Accept": "application/json"
-  };
+    // 3. 'op' (operation) 값에 따라 API 경로 분기
+    if (op === 'voices') {
+        apiUrl = `${baseUrl}/voices`;
+    } else if (op === 'tts') {
+        apiUrl = `${baseUrl}/tts`;
+    } else {
+        return res.status(400).json({ error: 'Invalid operation' });
+    }
 
-  try {
-    if (op === "ping") return jsonp({ ok: true });
+    try {
+        let response;
+        const headers = {
+            'X-SUPERTONE-API-KEY': process.env.SUPERTONE_API_KEY, // Vercel 환경 변수 사용
+            'Content-Type': 'application/json'
+        };
 
-    if (op === "voices") {
-      const r = await fetch(`${SUPERTONE_BASE}/voices`, { headers });
-      const text = await r.text();
-      if (!r.ok) return jsonp({ error: true, message: text || "voices error" }, r.status);
+        if (op === 'voices') {
+            // 목소리 목록 요청 (GET)
+            response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: headers
+            });
+        } else { // op === 'tts'
+            // TTS 요청 (POST)
+            const body = JSON.stringify({
+                voice_id: voiceId,
+                text: text,
+                language: language,
+                style: style,
+                model: model,
+                output: output
+            });
+            response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: headers,
+                body: body
+            });
+        }
 
-      // 응답 정규화: 배열만 내려주기
-      let data;
-      try { data = JSON.parse(text); } catch { data = []; }
-      let list = Array.isArray(data) ? data : (Array.isArray(data?.voices) ? data.voices : []);
-      const norm = list.map(v => ({
-        voice_id: v.voice_id || v.id,
-        name: v.name,
-        age: v.age,
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `API Error: ${response.status}`);
+        }
+        
+        // 4. 응답 형식에 맞게 클라이언트로 전달
+        if (op === 'voices') {
+            const data = await response.json();
+            res.status(200).json(data);
+        } else { // op === 'tts'
+            const audioBuffer = await response.arrayBuffer();
+            const contentType = response.headers.get('content-type');
+            const base64 = Buffer.from(audioBuffer).toString('base64');
+            res.status(200).json({ base64, contentType });
+        }
+
+    } catch (error) {
+        console.error('Proxy Error:', error);
+        res.status(500).json({ error: 'Proxy Server Error', message: error.message });
+    }
+};        age: v.age,
         gender: v.gender,
         language: v.language,
         styles: v.styles || [],
