@@ -1,39 +1,69 @@
-// api/proxy.js
-export default async function handler(req, res) {
-  // --- CORS ---
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-sup-api-key");
-  if (req.method === "OPTIONS") {
-    res.status(200).end();
-    return;
-  }
+// node-fetch v2를 사용해야 Vercel에서 호환성 문제 없이 동작합니다.
+// package.json에 "node-fetch": "^2.6.7" 로 명시해주세요.
+const fetch = require('node-fetch');
 
-  const SUPERTONE_BASE = "https://api.supertoneapi.com/v1";
-  const key = process.env.SUPERTONE_API_KEY;
-  const { op = "" } = req.query || {};
+module.exports = async (req, res) => {
+    // ✨ CORS 허가증(헤더) 설정 ✨
+    // 어떤 도메인からの 요청이든 허용합니다 ('*').
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    // GET, POST 등 지정된 방식의 요청만 허용합니다.
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    // 요청에 포함될 수 있는 헤더 종류를 지정합니다.
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  const send = (data, status = 200) => {
-    res.status(status).setHeader("Content-Type", "application/json; charset=utf-8");
-    res.send(JSON.stringify(data));
-  };
+    // 브라우저가 본 요청을 보내기 전에 OPTIONS 메소드로 사전 확인(preflight) 요청을 보냅니다.
+    // 이때 200 OK 응답을 보내줘야 본 요청이 정상적으로 진행됩니다.
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
 
-  if (!key) return send({ error: true, message: "missing SUPERTONE_API_KEY" }, 500);
+    // --- 기존 프록시 로직 ---
+    const { op, voiceId, text, language, style, model, output } = req.query;
+    const baseUrl = 'https://api.supertone.io/v1';
+    let apiUrl;
 
-  const headers = {
-    Authorization: `Bearer ${key}`,
-    "x-sup-api-key": key,
-    Accept: "application/json",
-  };
+    if (op === 'voices') {
+        apiUrl = `${baseUrl}/voices`;
+    } else if (op === 'tts') {
+        apiUrl = `${baseUrl}/tts`;
+    } else {
+        return res.status(400).json({ error: 'Invalid operation' });
+    }
 
-  try {
-    if (op === "ping") return send({ ok: true });
+    try {
+        const headers = {
+            'X-SUPERTONE-API-KEY': process.env.SUPERTONE_API_KEY,
+            'Content-Type': 'application/json'
+        };
 
-    if (op === "voices") {
-      const r = await fetch(`${SUPERTONE_BASE}/voices`, { headers });
-      const text = await r.text();
-      if (!r.ok) return send({ error: true, message: text || "voices error" }, r.status);
+        let response;
+        if (op === 'voices') {
+            response = await fetch(apiUrl, { method: 'GET', headers: headers });
+        } else { // op === 'tts'
+            const body = JSON.stringify({ voice_id: voiceId, text, language, style, model, output });
+            response = await fetch(apiUrl, { method: 'POST', headers: headers, body: body });
+        }
 
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: `API Error with status ${response.status}` }));
+            throw new Error(errorData.message || `API Error: ${response.status}`);
+        }
+        
+        if (op === 'voices') {
+            const data = await response.json();
+            res.status(200).json(data);
+        } else { // op === 'tts'
+            const audioBuffer = await response.arrayBuffer();
+            const contentType = response.headers.get('content-type');
+            const base64 = Buffer.from(audioBuffer).toString('base64');
+            res.status(200).json({ base64, contentType });
+        }
+
+    } catch (error) {
+        console.error('Proxy Error:', error);
+        res.status(500).json({ error: 'Proxy Server Error', message: error.message });
+    }
+};
       let data;
       try { data = JSON.parse(text); } catch { data = []; }
       const list = Array.isArray(data) ? data : (Array.isArray(data?.voices) ? data.voices : []);
