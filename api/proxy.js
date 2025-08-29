@@ -1,90 +1,59 @@
-const fetch = require('node-fetch');
+// api/proxy.js
+export default async function handler(req, res) {
+  // --- CORS ---
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-sup-api-key");
+  if (req.method === "OPTIONS") {
+    res.status(200).end();
+    return;
+  }
 
-module.exports = async (req, res) => {
-    // 1. 클라이언트가 보낸 쿼리 파라미터 가져오기
-    const { op, voiceId, text, language, style, model, output } = req.query;
+  const SUPERTONE_BASE = "https://api.supertoneapi.com/v1";
+  const key = process.env.SUPERTONE_API_KEY;
+  const { op = "" } = req.query || {};
 
-    // 2. Supertone API의 기본 URL
-    const baseUrl = 'https://api.supertone.io/v1';
-    let apiUrl;
+  const send = (data, status = 200) => {
+    res.status(status).setHeader("Content-Type", "application/json; charset=utf-8");
+    res.send(JSON.stringify(data));
+  };
 
-    // 3. 'op' (operation) 값에 따라 API 경로 분기
-    if (op === 'voices') {
-        apiUrl = `${baseUrl}/voices`;
-    } else if (op === 'tts') {
-        apiUrl = `${baseUrl}/tts`;
-    } else {
-        return res.status(400).json({ error: 'Invalid operation' });
-    }
+  if (!key) return send({ error: true, message: "missing SUPERTONE_API_KEY" }, 500);
 
-    try {
-        let response;
-        const headers = {
-            'X-SUPERTONE-API-KEY': process.env.SUPERTONE_API_KEY, // Vercel 환경 변수 사용
-            'Content-Type': 'application/json'
-        };
+  const headers = {
+    Authorization: `Bearer ${key}`,
+    "x-sup-api-key": key,
+    Accept: "application/json",
+  };
 
-        if (op === 'voices') {
-            // 목소리 목록 요청 (GET)
-            response = await fetch(apiUrl, {
-                method: 'GET',
-                headers: headers
-            });
-        } else { // op === 'tts'
-            // TTS 요청 (POST)
-            const body = JSON.stringify({
-                voice_id: voiceId,
-                text: text,
-                language: language,
-                style: style,
-                model: model,
-                output: output
-            });
-            response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: headers,
-                body: body
-            });
-        }
+  try {
+    if (op === "ping") return send({ ok: true });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || `API Error: ${response.status}`);
-        }
-        
-        // 4. 응답 형식에 맞게 클라이언트로 전달
-        if (op === 'voices') {
-            const data = await response.json();
-            res.status(200).json(data);
-        } else { // op === 'tts'
-            const audioBuffer = await response.arrayBuffer();
-            const contentType = response.headers.get('content-type');
-            const base64 = Buffer.from(audioBuffer).toString('base64');
-            res.status(200).json({ base64, contentType });
-        }
+    if (op === "voices") {
+      const r = await fetch(`${SUPERTONE_BASE}/voices`, { headers });
+      const text = await r.text();
+      if (!r.ok) return send({ error: true, message: text || "voices error" }, r.status);
 
-    } catch (error) {
-        console.error('Proxy Error:', error);
-        res.status(500).json({ error: 'Proxy Server Error', message: error.message });
-    }
-};        age: v.age,
-        gender: v.gender,
-        language: v.language,
-        styles: v.styles || [],
-        samples: v.samples || []
+      let data;
+      try { data = JSON.parse(text); } catch { data = []; }
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.voices) ? data.voices : []);
+      const norm = list.map(v => ({
+        voice_id: v.voice_id || v.id,
+        name: v.name, age: v.age, gender: v.gender,
+        language: v.language, styles: v.styles || [], samples: v.samples || []
       })).filter(v => v.voice_id);
 
-      return jsonp(norm);
+      return send(norm);
     }
 
     if (op === "tts") {
       const { voiceId = "", text = "", language = "ko", style = "neutral", model = "sona_speech_1", output = "mp3" } = req.query || {};
-      if (!voiceId) return jsonp({ error: true, message: "missing voiceId" }, 400);
+      if (!voiceId) return send({ error: true, message: "missing voiceId" }, 400);
 
       const r = await fetch(`${SUPERTONE_BASE}/text-to-speech/${encodeURIComponent(voiceId)}`, {
         method: "POST",
-        headers: { ...headers, "Content-Type": "application/json", "Accept": "*/*" },
-        body: JSON.stringify({ text, language, style, model, output_format: output })
+        headers: { ...headers, "Content-Type": "application/json", Accept: "*/*" },
+        body: JSON.stringify({ text, language, style, model, output_format: output }),
       });
 
       const buf = Buffer.from(await r.arrayBuffer());
@@ -92,12 +61,12 @@ module.exports = async (req, res) => {
       const len = r.headers.get("x-audio-length") || null;
       const payload = { status: r.status, contentType: ct, base64: buf.toString("base64"), audioLength: len };
 
-      if (!r.ok) return jsonp({ error: true, message: "tts error", ...payload }, r.status);
-      return jsonp(payload);
+      if (!r.ok) return send({ error: true, message: "tts error", ...payload }, r.status);
+      return send(payload);
     }
 
-    return jsonp({ error: true, message: "op not allowed" }, 400);
+    return send({ error: true, message: "op not allowed" }, 400);
   } catch (e) {
-    return jsonp({ error: true, message: String(e) }, 500);
+    return send({ error: true, message: String(e) }, 500);
   }
 }
