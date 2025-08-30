@@ -1,4 +1,4 @@
-// Vercel Serverless Function to fetch ALL voices from Supertone API, handling pagination.
+// Vercel Serverless Function to fetch ALL voices from Supertone API, handling pagination correctly.
 
 export default async function handler(req, res) {
   // Handle CORS Preflight OPTIONS request
@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   }
 
   // Set CORS headers for the actual request
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-control-allow-origin', '*');
 
   if (!process.env.SUPERTONE_API_KEY) {
     console.error("SUPERTONE_API_KEY is not set.");
@@ -23,12 +23,19 @@ export default async function handler(req, res) {
   
   try {
     let allVoices = [];
-    let nextUrl = 'https://supertoneapi.com/v1/voices?page_size=100'; // 효율성을 위해 페이지당 100개씩 로드
+    // Supertone API's pagination system uses a 'cursor' to get the next page.
+    let cursor = null; 
+    const pageSize = 100; // Load 100 voices per page for efficiency.
 
-    // 다음 페이지가 없을 때까지 반복
-    while (nextUrl) {
-      console.log(`Fetching voices from: ${nextUrl}`);
-      const response = await fetch(nextUrl, {
+    do {
+      let targetUrl = `https://supertoneapi.com/v1/voices?page_size=${pageSize}`;
+      // If there's a cursor from the previous page, add it to the URL.
+      if (cursor) {
+        targetUrl += `&cursor=${cursor}`;
+      }
+      
+      console.log(`Fetching voices from: ${targetUrl}`);
+      const response = await fetch(targetUrl, {
         headers: {
           'x-sup-api-key': process.env.SUPERTONE_API_KEY,
         },
@@ -42,14 +49,17 @@ export default async function handler(req, res) {
       const pageData = await response.json();
       
       const voicesOnPage = pageData.data || pageData.voices || [];
-      allVoices = allVoices.concat(voicesOnPage);
+      if(voicesOnPage.length > 0) {
+        allVoices = allVoices.concat(voicesOnPage);
+      }
       
-      // Supertone API는 응답에 다음 페이지 URL을 'next' 필드로 제공합니다.
-      nextUrl = pageData.next; 
-    }
+      // Update the cursor for the next loop iteration. If it's null, the loop will end.
+      cursor = pageData.next_cursor; 
+
+    } while (cursor); // Continue as long as there is a next_cursor.
 
     console.log(`Successfully fetched a total of ${allVoices.length} voices.`);
-    // 전체 목소리 목록을 구조화된 형식으로 반환
+    // Return the complete list of voices.
     return res.status(200).json({ voices: allVoices });
 
   } catch (error) {
