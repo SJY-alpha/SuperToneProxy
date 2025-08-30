@@ -25,11 +25,11 @@ export default async function handler(req, res) {
     let allVoices = [];
     // Supertone API's pagination system uses a 'cursor' to get the next page.
     let cursor = null; 
-    const pageSize = 100; // Load 100 voices per page for efficiency.
+    const pageSize = 100; // 효율성을 위해 페이지당 100개씩 로드
 
     do {
       let targetUrl = `https://supertoneapi.com/v1/voices?page_size=${pageSize}`;
-      // If there's a cursor from the previous page, add it to the URL.
+      // 이전 페이지에서 커서가 있으면 URL에 추가합니다.
       if (cursor) {
         targetUrl += `&cursor=${cursor}`;
       }
@@ -53,13 +53,13 @@ export default async function handler(req, res) {
         allVoices = allVoices.concat(voicesOnPage);
       }
       
-      // Update the cursor for the next loop iteration. If it's null, the loop will end.
+      // 다음 반복을 위해 커서를 업데이트합니다. null이면 루프가 종료됩니다.
       cursor = pageData.next_cursor; 
 
-    } while (cursor); // Continue as long as there is a next_cursor.
+    } while (cursor); // next_cursor가 있는 동안 계속합니다.
 
     console.log(`Successfully fetched a total of ${allVoices.length} voices.`);
-    // Return the complete list of voices.
+    // 전체 목소리 목록을 반환합니다.
     return res.status(200).json({ voices: allVoices });
 
   } catch (error) {
