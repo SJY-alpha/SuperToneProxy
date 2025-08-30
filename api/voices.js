@@ -23,10 +23,9 @@ export default async function handler(req, res) {
   
   try {
     let allVoices = [];
-    // Start with the first page URL
-    let nextUrl = 'https://supertoneapi.com/v1/voices?page_size=100'; 
+    let nextUrl = 'https://supertoneapi.com/v1/voices?page_size=100'; // 효율성을 위해 페이지당 100개씩 로드
 
-    // Loop as long as there is a next page URL
+    // 다음 페이지 URL이 없을 때까지 반복
     while (nextUrl) {
       console.log(`Fetching voices from: ${nextUrl}`);
       const response = await fetch(nextUrl, {
@@ -42,20 +41,18 @@ export default async function handler(req, res) {
 
       const pageData = await response.json();
       
-      // Find the array of voices on the current page
       const voicesOnPage = pageData.data || [];
       if(voicesOnPage.length > 0) {
         allVoices = allVoices.concat(voicesOnPage);
       }
       
-      // The Supertone API provides the full URL for the next page in the 'next' field.
-      // If 'next' is null or doesn't exist, the loop will terminate.
+      // Supertone API는 응답에 다음 페이지 URL을 'next' 필드로 제공합니다.
       nextUrl = pageData.next; 
 
     }
 
     console.log(`Successfully fetched a total of ${allVoices.length} voices.`);
-    // Return the complete list of all voices found
+    // 전체 목소리 목록을 구조화된 형식으로 반환
     return res.status(200).json({ voices: allVoices });
 
   } catch (error) {
