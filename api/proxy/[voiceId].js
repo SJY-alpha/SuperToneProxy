@@ -1,58 +1,44 @@
 // Vercel Serverless Function
-// POST /api/proxy/[voiceId]
+// CORS 헤더는 vercel.json에서 전역으로 처리하므로 여기서는 제거합니다.
 
 export default async function handler(req, res) {
-    // 1. CORS 헤더 설정 (기존과 동일)
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  // URL 경로에서 동적 voiceId를 추출합니다.
+  const { voiceId } = req.query;
 
-    if (req.method === "OPTIONS") {
-        return res.status(204).end();
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  if (!voiceId) {
+    return res.status(400).json({ error: 'Voice ID is required in the URL path.' });
+  }
+
+  try {
+    const upstreamResponse = await fetch(`https://api.supertoneapi.com/v1/text-to-speech/${voiceId}`, {
+      method: 'POST',
+      headers: {
+        'x-sup-api-key': process.env.SUPERTONE_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(req.body),
+    });
+
+    if (!upstreamResponse.ok) {
+      const errorText = await upstreamResponse.text();
+      return res.status(upstreamResponse.status).send(errorText);
     }
+    
+    // Supertone API로부터 받은 오디오 데이터를 Buffer로 변환합니다.
+    const audioBuffer = Buffer.from(await upstreamResponse.arrayBuffer());
 
-    if (req.method !== "POST") {
-        return res.status(405).send("Method Not Allowed");
-    }
+    // 응답 헤더를 설정하고 오디오 데이터를 클라이언트에 전송합니다.
+    res.setHeader('Content-Type', upstreamResponse.headers.get('content-type') || 'audio/wav');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).send(audioBuffer);
 
-    try {
-        // 2. (핵심 수정) URL 경로에서 voiceId 추출
-        const { voiceId } = req.query;
-        
-        // 3. (핵심 수정) 요청 본문(body)에서는 text 등 나머지 정보만 추출
-        const { text, language = "ko", style = "neutral", model = "sona_speech_1" } = req.body;
-
-        if (!text || !voiceId) {
-            return res.status(400).send("text and voiceId are required");
-        }
-        
-        // 4. Supertone API 최종 URL 조립
-        const supertoneApiUrl = `https://api.supertoneapi.com/v1/text-to-speech/${voiceId}`;
-        
-        // 5. Supertone API로 요청 전달
-        const upstreamResponse = await fetch(supertoneApiUrl, {
-            method: "POST",
-            headers: {
-                "x-sup-api-key": process.env.SUPERTONE_API_KEY,
-                "Content-Type": "application/json",
-            },
-            // 6. (핵심 수정) body에는 voice_id를 제외한 정보만 포함
-            body: JSON.stringify({ text, language, style, model }),
-        });
-
-        // 7. Supertone API의 응답을 클라이언트로 그대로 전달
-        if (!upstreamResponse.ok) {
-            const errorText = await upstreamResponse.text();
-            return res.status(upstreamResponse.status).send(errorText);
-        }
-
-        const audioBuffer = await upstreamResponse.arrayBuffer();
-        
-        res.setHeader("Content-Type", upstreamResponse.headers.get("content-type") || "audio/wav");
-        res.status(200).send(Buffer.from(audioBuffer));
-
-    } catch (e) {
-        console.error("TTS proxy error:", e);
-        res.status(500).send("Proxy fetch failed");
-    }
+  } catch (error) {
+    console.error('TTS proxy error:', error);
+    return res.status(500).json({ error: 'Proxy fetch failed' });
+  }
 }
+
