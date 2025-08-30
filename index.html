@@ -6,23 +6,33 @@
     <title>Supertone 보이스 라이브러리</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; }
-        .voice-card { 
-            transition: all 0.2s ease-in-out; 
-            background-color: white;
-            border: 1px solid #e5e7eb;
+        :root {
+            --sidebar-bg: #f8fafc;
+            --main-bg: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --accent-color: #3b82f6;
+            --border-color: #e2e8f0;
         }
-        .voice-card.selected { 
-            transform: translateY(-5px); 
-            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); 
-            border-color: #3b82f6; 
-            background-color: #eff6ff;
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --sidebar-bg: #1e293b;
+                --main-bg: #0f172a;
+                --text-primary: #f8fafc;
+                --text-secondary: #94a3b8;
+                --accent-color: #60a5fa;
+                --border-color: #334155;
+            }
         }
-        .loader { border-top-color: #3498db; animation: spin 1s linear infinite; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--main-bg); color: var(--text-primary); }
+        .sidebar { background-color: var(--sidebar-bg); }
+        .voice-card { background-color: var(--sidebar-bg); border: 1px solid var(--border-color); transition: all 0.2s ease-in-out; }
+        .voice-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .loader { border-top-color: var(--accent-color); animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         /* 스크롤바 스타일 */
         ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-track { background: var(--sidebar-bg); }
         ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #555; }
     </style>
@@ -30,92 +40,113 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="text-gray-800">
+<body class="flex h-screen">
 
-    <div class="flex h-screen">
-        <!-- Sidebar for Filters -->
-        <aside class="w-64 bg-white p-6 overflow-y-auto shadow-md">
-            <h2 class="text-xl font-bold mb-6">검색 필터</h2>
-            <div class="space-y-6">
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">언어 (Language)</label>
-                    <div id="language-filter" class="space-y-2">
-                         <button data-value="" class="filter-btn language-btn active w-full text-left p-2 rounded-md bg-blue-100 text-blue-800">전체</button>
-                         <button data-value="ko" class="filter-btn language-btn w-full text-left p-2 rounded-md hover:bg-gray-100">한국어</button>
-                         <button data-value="en" class="filter-btn language-btn w-full text-left p-2 rounded-md hover:bg-gray-100">영어</button>
-                         <button data-value="ja" class="filter-btn language-btn w-full text-left p-2 rounded-md hover:bg-gray-100">일본어</button>
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">성별 (Gender)</label>
-                    <div id="gender-filter" class="space-y-2">
-                        <button data-value="" class="filter-btn gender-btn active w-full text-left p-2 rounded-md bg-blue-100 text-blue-800">전체</button>
-                        <button data-value="male" class="filter-btn gender-btn w-full text-left p-2 rounded-md hover:bg-gray-100">남성</button>
-                        <button data-value="female" class="filter-btn gender-btn w-full text-left p-2 rounded-md hover:bg-gray-100">여성</button>
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">연령대 (Age)</label>
-                    <div id="age-filter" class="space-y-2">
-                        <button data-value="" class="filter-btn age-btn active w-full text-left p-2 rounded-md bg-blue-100 text-blue-800">전체</button>
-                        <button data-value="child" class="filter-btn age-btn w-full text-left p-2 rounded-md hover:bg-gray-100">어린이</button>
-                        <button data-value="young-adult" class="filter-btn age-btn w-full text-left p-2 rounded-md hover:bg-gray-100">청년</button>
-                        <button data-value="middle-aged" class="filter-btn age-btn w-full text-left p-2 rounded-md hover:bg-gray-100">중년</button>
-                        <button data-value="old" class="filter-btn age-btn w-full text-left p-2 rounded-md hover:bg-gray-100">노년</button>
-                    </div>
-                </div>
-                 <div>
-                    <label for="name-filter-input" class="block text-sm font-semibold text-gray-700 mb-2">이름으로 검색</label>
-                    <input type="text" id="name-filter-input" placeholder="이름 입력..." class="w-full px-3 py-2 text-gray-700 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+    <!-- Sidebar for Filters -->
+    <aside class="sidebar w-64 p-6 flex-shrink-0 overflow-y-auto">
+        <h2 class="text-xl font-bold mb-6">검색 필터</h2>
+        <div class="space-y-6">
+            <!-- Language Filter -->
+            <div>
+                <h3 class="font-semibold mb-2">언어 (Language)</h3>
+                <div class="space-y-2 filter-group" data-filter-key="language">
+                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="">전체</button>
+                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="ko">한국어</button>
+                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="en">영어</button>
+                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="ja">일본어</button>
                 </div>
             </div>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="flex-1 flex flex-col">
-            <header class="bg-white p-4 shadow-sm z-10">
-                <h1 class="text-2xl font-bold text-gray-900">Supertone 보이스 라이브러리</h1>
-                <p id="status-message" class="text-sm text-gray-600 mt-1 h-5"></p>
-            </header>
-            
-            <div id="voice-list-container" class="flex-1 p-6 overflow-y-auto">
-                 <div id="voice-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                    <!-- Voice cards will be dynamically inserted here -->
+            <!-- Gender Filter -->
+            <div>
+                <h3 class="font-semibold mb-2">성별 (Gender)</h3>
+                <div class="space-y-2 filter-group" data-filter-key="gender">
+                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="">전체</button>
+                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="male">남성</button>
+                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="female">여성</button>
                 </div>
             </div>
-             <footer class="bg-white p-4 shadow-inner">
-                <div class="flex items-center gap-4">
-                    <div class="flex-1">
-                         <label for="text-input" class="sr-only">변환할 텍스트</label>
-                         <input id="text-input" class="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="텍스트를 입력하여 선택한 목소리로 생성해보세요...">
-                    </div>
-                    <button id="generate-btn" class="bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-200 flex items-center justify-center text-lg disabled:bg-gray-400" disabled>
-                        <svg id="generate-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.858 5.858a9 9 0 0112.728 0m-2.828 9.9a5 5 0 01-7.072 0" /></svg>
-                        <span id="generate-btn-text">생성하기</span>
-                        <div id="generate-loader" class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-6 w-6 mr-2 hidden"></div>
-                    </button>
+            <!-- Age Filter -->
+            <div>
+                <h3 class="font-semibold mb-2">연령대 (Age)</h3>
+                <div class="space-y-2 filter-group" data-filter-key="age">
+                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="">전체</button>
+                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="child">어린이</button>
+                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="young-adult">청년</button>
+                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="middle-aged">중년</button>
+                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="elder">노년</button>
                 </div>
-            </footer>
-        </main>
-    </div>
+            </div>
+             <!-- Name Search -->
+             <div>
+                <h3 class="font-semibold mb-2">이름으로 검색</h3>
+                <input type="text" id="name-search" placeholder="이름 입력..." class="w-full p-2 border rounded-md bg-transparent border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col p-6">
+        <header class="mb-4">
+            <h1 class="text-3xl font-bold">Supertone 보이스 라이브러리</h1>
+            <p id="status-message" class="text-secondary h-6"></p>
+        </header>
+        
+        <div id="voice-grid" class="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 overflow-y-auto pr-2">
+            <!-- Voice cards will be dynamically inserted here -->
+        </div>
+
+        <div id="empty-state" class="hidden flex-1 items-center justify-center">
+            <p class="text-secondary text-lg">조건에 맞는 목소리가 없습니다.</p>
+        </div>
+         <div id="loading-state" class="flex flex-1 items-center justify-center">
+            <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-24 w-24"></div>
+        </div>
+
+
+        <!-- TTS Control Panel -->
+        <footer class="mt-4 p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg shadow-md flex items-center gap-4">
+            <textarea id="text-input" rows="1" class="flex-grow p-2 border rounded-md bg-transparent border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="텍스트를 입력하여 선택한 목소리로 생성해보세요..."></textarea>
+            <button id="generate-btn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition flex items-center" disabled>
+                <svg id="generate-icon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.858 5.858a9 9 0 0112.728 0m-2.828 9.9a5 5 0 01-7.072 0" /></svg>
+                <span id="generate-btn-text">생성하기</span>
+                <div id="generate-loader" class="loader ease-linear rounded-full border-2 border-t-2 border-gray-200 h-5 w-5 mr-2 hidden"></div>
+            </button>
+        </footer>
+    </main>
 
     <script>
-        const PROXY_BASE_URL = ""; 
-        let selectedVoiceId = null;
+        const PROXY_BASE_URL = "";
         let allVoices = [];
+        let currentFilters = {
+            language: '',
+            gender: '',
+            age: '',
+            name: ''
+        };
+        let selectedVoiceId = null;
+        let audioPlayer = null;
 
         const statusMessage = document.getElementById('status-message');
-        const voiceList = document.getElementById('voice-list');
+        const voiceGrid = document.getElementById('voice-grid');
+        const emptyState = document.getElementById('empty-state');
+        const loadingState = document.getElementById('loading-state');
         const textInput = document.getElementById('text-input');
-        const nameFilterInput = document.getElementById('name-filter-input');
-        
+        const generateBtn = document.getElementById('generate-btn');
+        const generateBtnText = document.getElementById('generate-btn-text');
+        const generateLoader = document.getElementById('generate-loader');
+        const generateIcon = document.getElementById('generate-icon');
+
         async function getVoices() {
             const res = await fetch(`${PROXY_BASE_URL}/api/voices`);
-            if (!res.ok) throw new Error(await res.text());
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(errorText || `Server Error: ${res.status}`);
+            }
             const data = await res.json();
+            // 서버가 { voices: [...] } 형태로 응답하므로, data.voices를 확인합니다.
             return data.voices || [];
         }
-        
+
         async function tts(text, voiceId) {
             const res = await fetch(`${PROXY_BASE_URL}/api/proxy/${voiceId}`, {
                 method: "POST",
@@ -125,155 +156,128 @@
             if (!res.ok) throw new Error(await res.text());
             const blob = await res.blob();
             const url = URL.createObjectURL(blob);
-            new Audio(url).play();
+            if (audioPlayer) audioPlayer.pause();
+            audioPlayer = new Audio(url);
+            audioPlayer.play();
         }
 
-        function displayVoices(voices) {
-            voiceList.innerHTML = '';
-            if (voices.length === 0) {
-                voiceList.innerHTML = `<p class="col-span-full text-center text-gray-500 py-10">조건에 맞는 목소리가 없습니다.</p>`;
-                return;
+        function renderVoices() {
+            voiceGrid.innerHTML = '';
+            
+            const filteredVoices = allVoices.filter(voice => {
+                return (currentFilters.language ? voice.language.includes(currentFilters.language) : true) &&
+                       (currentFilters.gender ? voice.gender === currentFilters.gender : true) &&
+                       (currentFilters.age ? voice.age === currentFilters.age : true) &&
+                       (currentFilters.name ? voice.name.toLowerCase().includes(currentFilters.name.toLowerCase()) : true);
+            });
+
+            statusMessage.textContent = `${filteredVoices.length}개의 목소리를 찾았습니다. (총 ${allVoices.length}개)`;
+
+            if (filteredVoices.length === 0) {
+                emptyState.classList.remove('hidden');
+                voiceGrid.classList.add('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                voiceGrid.classList.remove('hidden');
             }
-            voices.forEach(voice => {
+
+            filteredVoices.forEach(voice => {
                 const card = document.createElement('div');
-                card.className = 'voice-card flex flex-col rounded-lg shadow hover:shadow-xl cursor-pointer';
+                card.className = 'voice-card p-4 rounded-lg flex flex-col items-center text-center cursor-pointer';
+                card.dataset.voiceId = voice.voice_id;
+
+                card.innerHTML = `
+                    <img src="${voice.thumbnail_image_url || 'https://placehold.co/80x80/e2e8f0/64748b?text=??'}" alt="${voice.name}" class="w-20 h-20 rounded-full mb-3 object-cover border-2 border-transparent">
+                    <h3 class="font-bold text-md">${voice.name}</h3>
+                    <p class="text-xs text-gray-500">${voice.gender}, ${voice.age}</p>
+                    <button data-sample-url="${voice.samples?.[0]?.url}" class="mt-2 text-xs bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded-full hover:bg-gray-300 dark:hover:bg-gray-500 transition disabled:opacity-50" ${!voice.samples?.[0]?.url ? 'disabled' : ''}>샘플 듣기</button>
+                `;
                 
-                const imageContainer = document.createElement('div');
-                imageContainer.className = 'relative';
-                
-                const img = document.createElement('img');
-                img.src = voice.thumbnail_image_url || 'https://placehold.co/300x300/e2e8f0/64748b?text=?';
-                img.alt = voice.name;
-                img.className = 'w-full h-48 object-cover rounded-t-lg';
-                img.onerror = () => { img.src = 'https://placehold.co/300x300/e2e8f0/64748b?text=?'; };
+                voiceGrid.appendChild(card);
 
-                const playButton = document.createElement('button');
-                playButton.className = 'absolute bottom-2 right-2 p-2 bg-white/70 text-blue-600 rounded-full hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 backdrop-blur-sm';
-                const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /></svg>`;
-                
-                const defaultSample = voice.samples && voice.samples.length > 0 ? voice.samples[0].url : null;
-                if (defaultSample) {
-                    playButton.innerHTML = playIcon;
-                    playButton.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        new Audio(defaultSample).play();
-                    });
-                } else {
-                    playButton.disabled = true;
-                    playButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.858 5.858a9 9 0 0112.728 0m-2.828 9.9a5 5 0 01-7.072 0" /></svg>`;
-                }
-
-                imageContainer.appendChild(img);
-                imageContainer.appendChild(playButton);
-
-                const infoContainer = document.createElement('div');
-                infoContainer.className = 'p-4 flex-1 flex flex-col';
-                
-                const name = document.createElement('h3');
-                name.className = 'font-bold text-lg text-gray-900';
-                name.textContent = voice.name;
-
-                const tags = document.createElement('p');
-                tags.className = 'text-xs text-gray-500 mt-1';
-                const langTag = (voice.language && voice.language.length > 0) ? voice.language[0].toUpperCase() : '';
-                tags.textContent = `${voice.gender || ''} | ${voice.age || ''} | ${langTag}`;
-
-                infoContainer.appendChild(name);
-                infoContainer.appendChild(tags);
-
-                card.appendChild(imageContainer);
-                card.appendChild(infoContainer);
+                card.querySelector('button').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const sampleUrl = e.target.dataset.sampleUrl;
+                    if(sampleUrl) {
+                        if (audioPlayer) audioPlayer.pause();
+                        audioPlayer = new Audio(sampleUrl);
+                        audioPlayer.play();
+                    }
+                });
 
                 card.addEventListener('click', () => {
-                    document.querySelectorAll('.voice-card').forEach(c => c.classList.remove('selected'));
-                    card.classList.add('selected');
+                    document.querySelectorAll('.voice-card').forEach(c => {
+                        c.classList.remove('ring-2', 'ring-blue-500');
+                        c.querySelector('img').classList.remove('border-blue-500');
+                    });
+                    card.classList.add('ring-2', 'ring-blue-500');
+                    card.querySelector('img').classList.add('border-blue-500');
                     selectedVoiceId = voice.voice_id;
                     updateGenerateButtonState();
-                });
-                voiceList.appendChild(card);
-            });
-        }
-        
-        function applyFilters() {
-            const activeFilters = {
-                language: document.querySelector('.language-btn.active').dataset.value,
-                gender: document.querySelector('.gender-btn.active').dataset.value,
-                age: document.querySelector('.age-btn.active').dataset.value,
-                name: nameFilterInput.value.toLowerCase()
-            };
-
-            const filteredVoices = allVoices.filter(voice => {
-                const langMatch = !activeFilters.language || (voice.language && voice.language.includes(activeFilters.language));
-                const genderMatch = !activeFilters.gender || voice.gender === activeFilters.gender;
-                const ageMatch = !activeFilters.age || voice.age === activeFilters.age;
-                const nameMatch = !activeFilters.name || voice.name.toLowerCase().includes(activeFilters.name);
-                return langMatch && genderMatch && ageMatch && nameMatch;
-            });
-
-            displayVoices(filteredVoices);
-            statusMessage.textContent = `${filteredVoices.length}개의 목소리를 찾았습니다. (총 ${allVoices.length}개)`;
-        }
-
-        function setupFilterButtons(className) {
-            const buttons = document.querySelectorAll(`.${className}`);
-            buttons.forEach(button => {
-                button.addEventListener('click', () => {
-                    buttons.forEach(btn => btn.classList.remove('active', 'bg-blue-100', 'text-blue-800'));
-                    button.classList.add('active', 'bg-blue-100', 'text-blue-800');
-                    applyFilters();
                 });
             });
         }
         
         function updateGenerateButtonState() {
-            const generateBtn = document.getElementById('generate-btn');
-            generateBtn.disabled = !(selectedVoiceId && textInput.value.trim() !== "");
+            generateBtn.disabled = !(selectedVoiceId && textInput.value.trim());
         }
-        
+
+        // Event Listeners
+        document.querySelectorAll('.filter-group').forEach(group => {
+            group.addEventListener('click', (e) => {
+                if (e.target.classList.contains('filter-btn')) {
+                    const key = group.dataset.filterKey;
+                    const value = e.target.dataset.value;
+
+                    currentFilters[key] = value;
+
+                    group.querySelectorAll('.filter-btn').forEach(btn => {
+                        btn.classList.remove('bg-blue-500', 'text-white');
+                        btn.classList.remove('dark:bg-blue-500');
+                    });
+                    e.target.classList.add('bg-blue-500', 'text-white');
+                    e.target.classList.add('dark:bg-blue-500');
+                    
+                    renderVoices();
+                }
+            });
+        });
+
+        document.getElementById('name-search').addEventListener('input', (e) => {
+            currentFilters.name = e.target.value;
+            renderVoices();
+        });
+
         textInput.addEventListener('input', updateGenerateButtonState);
-        nameFilterInput.addEventListener('input', applyFilters);
 
-        document.getElementById('generate-btn').addEventListener('click', async () => {
-            const btn = document.getElementById('generate-btn');
-            const btnText = document.getElementById('generate-btn-text');
-            const loader = document.getElementById('generate-loader');
-            const icon = document.getElementById('generate-icon');
-
-            if (btn.disabled) return;
-
-            loader.classList.remove('hidden');
-            icon.classList.add('hidden');
-            btnText.textContent = "생성 중...";
-            btn.disabled = true;
-            
+        generateBtn.addEventListener('click', async () => {
+            if (generateBtn.disabled) return;
+            generateLoader.classList.remove('hidden');
+            generateIcon.classList.add('hidden');
+            generateBtnText.textContent = "생성중...";
+            generateBtn.disabled = true;
             try {
                 await tts(textInput.value, selectedVoiceId);
             } catch (error) {
-                console.error("TTS Error:", error);
-                alert(`음성 생성에 실패했습니다: ${error.message}`);
+                alert(`음성 생성 실패: ${error.message}`);
             } finally {
-                loader.classList.add('hidden');
-                icon.classList.remove('hidden');
-                btnText.textContent = "생성하기";
+                generateLoader.classList.add('hidden');
+                generateIcon.classList.remove('hidden');
+                generateBtnText.textContent = "생성하기";
                 updateGenerateButtonState();
             }
         });
-
+        
+        // Initial Load
         window.addEventListener('load', async () => {
-            statusMessage.textContent = '전체 목소리 목록을 불러오는 중...';
-            voiceList.innerHTML = `<div class="col-span-full flex justify-center items-center py-20"><div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-32 w-32"></div></div>`;
+            statusMessage.textContent = '전체 목소리 목록을 불러오는 중... (조금 걸릴 수 있습니다)';
             try {
                 allVoices = await getVoices();
-                displayVoices(allVoices);
-                statusMessage.textContent = `${allVoices.length}개의 목소리를 성공적으로 불러왔습니다.`;
-                
-                setupFilterButtons('language-btn');
-                setupFilterButtons('gender-btn');
-                setupFilterButtons('age-btn');
-
+                loadingState.classList.add('hidden');
+                renderVoices();
             } catch (error) {
-                console.error("Failed to load voices:", error);
-                statusMessage.textContent = `오류: 목소리 목록을 불러오지 못했습니다. (${error.message})`;
+                loadingState.classList.add('hidden');
+                statusMessage.textContent = `오류: ${error.message}`;
                 statusMessage.classList.add('text-red-600');
             }
         });
