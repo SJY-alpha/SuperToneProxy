@@ -1,4 +1,5 @@
-// Vercel Serverless Function to fetch ALL voices from Supertone API, handling pagination correctly.
+// Vercel Serverless Function to fetch a large, single page of voices from Supertone API.
+// This avoids pagination errors by requesting up to 100 voices at once.
 
 export default async function handler(req, res) {
   // Handle CORS Preflight OPTIONS request
@@ -22,38 +23,26 @@ export default async function handler(req, res) {
   }
   
   try {
-    let allVoices = [];
-    let nextUrl = 'https://supertoneapi.com/v1/voices?page_size=100'; // 효율성을 위해 페이지당 100개씩 로드
+    // Request a single page with a large number of items (up to 100 is a safe max).
+    const pageSize = 100;
+    const targetUrl = `https://supertoneapi.com/v1/voices?page_size=${pageSize}`;
+    
+    console.log(`Fetching a single page of voices from: ${targetUrl}`);
+    const response = await fetch(targetUrl, {
+      headers: {
+        'x-sup-api-key': process.env.SUPERTONE_API_KEY,
+      },
+    });
 
-    // 다음 페이지 URL이 없을 때까지 반복
-    while (nextUrl) {
-      console.log(`Fetching voices from: ${nextUrl}`);
-      const response = await fetch(nextUrl, {
-        headers: {
-          'x-sup-api-key': process.env.SUPERTONE_API_KEY,
-        },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Supertone API Error: ${response.status} ${errorText}`);
-      }
-
-      const pageData = await response.json();
-      
-      const voicesOnPage = pageData.data || [];
-      if(voicesOnPage.length > 0) {
-        allVoices = allVoices.concat(voicesOnPage);
-      }
-      
-      // Supertone API는 응답에 다음 페이지 URL을 'next' 필드로 제공합니다.
-      nextUrl = pageData.next; 
-
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Supertone API Error: ${response.status} ${errorText}`);
     }
 
-    console.log(`Successfully fetched a total of ${allVoices.length} voices.`);
-    // 전체 목소리 목록을 구조화된 형식으로 반환
-    return res.status(200).json({ voices: allVoices });
+    const pageData = await response.json();
+    
+    // Forward the entire successful response to the client.
+    return res.status(200).json(pageData);
 
   } catch (error) {
     console.error('Voices proxy internal error:', error);
