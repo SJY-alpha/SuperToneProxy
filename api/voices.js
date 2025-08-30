@@ -1,4 +1,4 @@
-// Vercel Serverless Function to proxy voice list requests, with corrected search handling.
+// Vercel Serverless Function to fetch ALL voices from Supertone API, handling pagination.
 
 export default async function handler(req, res) {
   // Handle CORS Preflight OPTIONS request
@@ -21,39 +21,40 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
   
-  // Vercel automatically parses query parameters into req.query. We use this object.
-  const queryParams = req.query;
-  
-  const baseUrl = 'https://supertoneapi.com/v1/voices';
-  let targetUrl = baseUrl;
-
-  // If there are any query parameters from the client, use the /search endpoint.
-  if (Object.keys(queryParams).length > 0) {
-      const searchParams = new URLSearchParams(queryParams);
-      targetUrl = `${baseUrl}/search?${searchParams.toString()}`;
-  }
-  
-  console.log(`Forwarding request to: ${targetUrl}`);
-
   try {
-    const upstreamResponse = await fetch(targetUrl, {
-      headers: {
-        'x-sup-api-key': process.env.SUPERTONE_API_KEY,
-      },
-    });
+    let allVoices = [];
+    let nextUrl = 'https://supertoneapi.com/v1/voices?page_size=100'; // 효율성을 위해 페이지당 100개씩 로드
 
-    if (!upstreamResponse.ok) {
-      const errorText = await upstreamResponse.text();
-      console.error(`Error from Supertone API: ${upstreamResponse.status} ${errorText}`);
-      return res.status(upstreamResponse.status).send(errorText);
+    // 다음 페이지가 없을 때까지 반복
+    while (nextUrl) {
+      console.log(`Fetching voices from: ${nextUrl}`);
+      const response = await fetch(nextUrl, {
+        headers: {
+          'x-sup-api-key': process.env.SUPERTONE_API_KEY,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Supertone API Error: ${response.status} ${errorText}`);
+      }
+
+      const pageData = await response.json();
+      
+      const voicesOnPage = pageData.data || pageData.voices || [];
+      allVoices = allVoices.concat(voicesOnPage);
+      
+      // Supertone API는 응답에 다음 페이지 URL을 'next' 필드로 제공합니다.
+      nextUrl = pageData.next; 
     }
-    
-    const data = await upstreamResponse.json();
-    return res.status(200).json(data);
+
+    console.log(`Successfully fetched a total of ${allVoices.length} voices.`);
+    // 전체 목소리 목록을 구조화된 형식으로 반환
+    return res.status(200).json({ voices: allVoices });
 
   } catch (error) {
     console.error('Voices proxy internal error:', error);
-    return res.status(500).json({ error: 'An internal error occurred in the proxy server.' });
+    return res.status(500).json({ error: `An internal error occurred: ${error.message}` });
   }
 }
 
