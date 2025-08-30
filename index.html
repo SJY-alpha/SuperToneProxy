@@ -3,285 +3,328 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Supertone 보이스 라이브러리</title>
+    <title>Supertone API Voice Player</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        :root {
-            --sidebar-bg: #f8fafc;
-            --main-bg: #ffffff;
-            --text-primary: #1e293b;
-            --text-secondary: #64748b;
-            --accent-color: #3b82f6;
-            --border-color: #e2e8f0;
-        }
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --sidebar-bg: #1e293b;
-                --main-bg: #0f172a;
-                --text-primary: #f8fafc;
-                --text-secondary: #94a3b8;
-                --accent-color: #60a5fa;
-                --border-color: #334155;
-            }
-        }
-        body { font-family: 'Inter', sans-serif; background-color: var(--main-bg); color: var(--text-primary); }
-        .sidebar { background-color: var(--sidebar-bg); }
-        .voice-card { background-color: var(--sidebar-bg); border: 1px solid var(--border-color); transition: all 0.2s ease-in-out; }
-        .voice-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .loader { border-top-color: var(--accent-color); animation: spin 1s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        /* 스크롤바 스타일 */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: var(--sidebar-bg); }
-        ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #555; }
-    </style>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* 스크롤바 디자인 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #2d3748;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4a5568;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #718096;
+        }
+        .voice-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .voice-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+    </style>
 </head>
-<body class="flex h-screen">
+<body class="bg-gray-900 text-white">
 
-    <!-- Sidebar for Filters -->
-    <aside class="sidebar w-64 p-6 flex-shrink-0 overflow-y-auto">
-        <h2 class="text-xl font-bold mb-6">검색 필터</h2>
-        <div class="space-y-6">
-            <!-- Language Filter -->
-            <div>
-                <h3 class="font-semibold mb-2">언어 (Language)</h3>
-                <div class="space-y-2 filter-group" data-filter-key="language">
-                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="">전체</button>
-                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="ko">한국어</button>
-                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="en">영어</button>
-                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="ja">일본어</button>
-                </div>
-            </div>
-            <!-- Gender Filter -->
-            <div>
-                <h3 class="font-semibold mb-2">성별 (Gender)</h3>
-                <div class="space-y-2 filter-group" data-filter-key="gender">
-                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="">전체</button>
-                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="male">남성</button>
-                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="female">여성</button>
-                </div>
-            </div>
-            <!-- Age Filter -->
-            <div>
-                <h3 class="font-semibold mb-2">연령대 (Age)</h3>
-                <div class="space-y-2 filter-group" data-filter-key="age">
-                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="">전체</button>
-                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="child">어린이</button>
-                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="young-adult">청년</button>
-                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="middle-aged">중년</button>
-                    <button class="filter-btn w-full text-left p-2 rounded-md" data-value="elder">노년</button>
-                </div>
-            </div>
-             <!-- Name Search -->
-             <div>
-                <h3 class="font-semibold mb-2">이름으로 검색</h3>
-                <input type="text" id="name-search" placeholder="이름 입력..." class="w-full p-2 border rounded-md bg-transparent border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-        </div>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="flex-1 flex flex-col p-6">
-        <header class="mb-4">
-            <h1 class="text-3xl font-bold">Supertone 보이스 라이브러리</h1>
-            <p id="status-message" class="text-secondary h-6"></p>
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold text-center mb-2">Supertone Voice Player</h1>
+            <p class="text-center text-gray-400">Supertone API를 사용하여 목소리를 검색하고 들어보세요.</p>
         </header>
-        
-        <div id="voice-grid" class="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 overflow-y-auto pr-2">
-            <!-- Voice cards will be dynamically inserted here -->
+
+        <!-- TTS 생성 섹션 -->
+        <div class="bg-gray-800 rounded-xl p-6 mb-8 sticky top-4 z-10 shadow-lg">
+            <h2 class="text-2xl font-semibold mb-4">Text-to-Speech</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-2">
+                    <textarea id="tts-text" class="w-full h-24 p-3 bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition" placeholder="음성으로 변환할 텍스트를 입력하세요 (최대 300자)"></textarea>
+                </div>
+                <div class="flex flex-col justify-between">
+                    <div id="selected-voice-info" class="text-center md:text-left mb-2 p-3 bg-gray-700/50 rounded-md h-12 flex items-center justify-center">
+                        <span class="text-gray-400">목소리를 선택하세요</span>
+                    </div>
+                    <button id="generate-button" class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-md transition duration-300">
+                        <span id="generate-button-text">오디오 생성</span>
+                        <div id="generate-spinner" class="hidden animate-spin rounded-full h-5 w-5 border-b-2 border-white mx-auto"></div>
+                    </button>
+                </div>
+            </div>
+            <audio id="audio-player" controls class="w-full mt-4"></audio>
         </div>
 
-        <div id="empty-state" class="hidden flex-1 items-center justify-center">
-            <p class="text-secondary text-lg">조건에 맞는 목소리가 없습니다.</p>
+        <!-- 음성 목록 및 필터 -->
+        <div>
+            <h2 class="text-2xl font-semibold mb-4">Voice List</h2>
+            <!-- 필터 -->
+            <div class="flex flex-wrap gap-4 mb-6">
+                <input type="text" id="search-input" placeholder="이름으로 검색..." class="flex-grow bg-gray-800 p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]">
+                <select id="language-filter" class="bg-gray-800 p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">모든 언어</option>
+                </select>
+                <select id="style-filter" class="bg-gray-800 p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">모든 스타일</option>
+                </select>
+            </div>
+            
+            <!-- 음성 목록 -->
+            <div id="voice-list-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <!-- 로딩 스피너 -->
+                <div id="list-spinner" class="col-span-full flex justify-center items-center h-64">
+                    <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
+                </div>
+                <!-- 에러 메시지 -->
+                <div id="list-error" class="hidden col-span-full text-center text-red-400 bg-red-900/50 p-4 rounded-md"></div>
+            </div>
         </div>
-         <div id="loading-state" class="flex flex-1 items-center justify-center">
-            <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-24 w-24"></div>
-        </div>
-
-
-        <!-- TTS Control Panel -->
-        <footer class="mt-4 p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg shadow-md flex items-center gap-4">
-            <textarea id="text-input" rows="1" class="flex-grow p-2 border rounded-md bg-transparent border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="텍스트를 입력하여 선택한 목소리로 생성해보세요..."></textarea>
-            <button id="generate-btn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition flex items-center" disabled>
-                <svg id="generate-icon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.858 5.858a9 9 0 0112.728 0m-2.828 9.9a5 5 0 01-7.072 0" /></svg>
-                <span id="generate-btn-text">생성하기</span>
-                <div id="generate-loader" class="loader ease-linear rounded-full border-2 border-t-2 border-gray-200 h-5 w-5 mr-2 hidden"></div>
-            </button>
-        </footer>
-    </main>
+    </div>
 
     <script>
-        const PROXY_BASE_URL = "";
-        let allVoices = [];
-        let currentFilters = {
-            language: '',
-            gender: '',
-            age: '',
-            name: ''
-        };
-        let selectedVoiceId = null;
-        let audioPlayer = null;
+        document.addEventListener('DOMContentLoaded', () => {
+            // UI 요소
+            const ttsText = document.getElementById('tts-text');
+            const generateButton = document.getElementById('generate-button');
+            const generateButtonText = document.getElementById('generate-button-text');
+            const generateSpinner = document.getElementById('generate-spinner');
+            const audioPlayer = document.getElementById('audio-player');
+            const selectedVoiceInfo = document.getElementById('selected-voice-info');
+            const searchInput = document.getElementById('search-input');
+            const languageFilter = document.getElementById('language-filter');
+            const styleFilter = document.getElementById('style-filter');
+            const voiceListContainer = document.getElementById('voice-list-container');
+            const listSpinner = document.getElementById('list-spinner');
+            const listError = document.getElementById('list-error');
 
-        const statusMessage = document.getElementById('status-message');
-        const voiceGrid = document.getElementById('voice-grid');
-        const emptyState = document.getElementById('empty-state');
-        const loadingState = document.getElementById('loading-state');
-        const textInput = document.getElementById('text-input');
-        const generateBtn = document.getElementById('generate-btn');
-        const generateBtnText = document.getElementById('generate-btn-text');
-        const generateLoader = document.getElementById('generate-loader');
-        const generateIcon = document.getElementById('generate-icon');
+            // 상태 관리
+            let allVoices = [];
+            let selectedVoice = null;
 
-        async function getVoices() {
-            const res = await fetch(`${PROXY_BASE_URL}/api/voices`);
-            if (!res.ok) {
-                const errorText = await res.text();
-                throw new Error(errorText || `Server Error: ${res.status}`);
-            }
-            const data = await res.json();
-            // The API response structure from Supertone is { data: [...] }. This reliably extracts the array.
-            return data.data || [];
-        }
+            // --- 데이터 로딩 및 초기화 ---
 
-        async function tts(text, voiceId) {
-            const res = await fetch(`${PROXY_BASE_URL}/api/proxy/${voiceId}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text, language: "ko", style: "neutral" })
-            });
-            if (!res.ok) throw new Error(await res.text());
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            if (audioPlayer) audioPlayer.pause();
-            audioPlayer = new Audio(url);
-            audioPlayer.play();
-        }
+            async function fetchVoices() {
+                showLoadingState(true);
+                try {
+                    // 제공된 매뉴얼에 따라, 2025-08-31 이후 사용자 음성은 /v1/custom-voices 로 분리됩니다.
+                    // 따라서 두 엔드포인트를 모두 호출하여 목소리 목록을 합칩니다.
+                    // 실제 배포 시에는 Vercel에 /api/voices 와 /api/custom-voices 프록시 함수를 만들어야 합니다.
+                    const [presetVoicesRes, customVoicesRes] = await Promise.all([
+                        fetch('/api/voices').catch(e => ({ ok: false, status: e.toString() })),
+                        fetch('/api/custom-voices').catch(e => ({ ok: false, status: e.toString() }))
+                    ]);
 
-        function renderVoices() {
-            voiceGrid.innerHTML = '';
-            
-            const filteredVoices = allVoices.filter(voice => {
-                return (currentFilters.language ? voice.language.includes(currentFilters.language) : true) &&
-                       (currentFilters.gender ? voice.gender === currentFilters.gender : true) &&
-                       (currentFilters.age ? voice.age === currentFilters.age : true) &&
-                       (currentFilters.name ? voice.name.toLowerCase().includes(currentFilters.name.toLowerCase()) : true);
-            });
-
-            statusMessage.textContent = `${filteredVoices.length}개의 목소리를 찾았습니다. (총 ${allVoices.length}개)`;
-
-            if (filteredVoices.length === 0) {
-                emptyState.classList.remove('hidden');
-                voiceGrid.classList.add('hidden');
-            } else {
-                emptyState.classList.add('hidden');
-                voiceGrid.classList.remove('hidden');
-            }
-
-            filteredVoices.forEach(voice => {
-                const card = document.createElement('div');
-                card.className = 'voice-card p-4 rounded-lg flex flex-col items-center text-center cursor-pointer';
-                card.dataset.voiceId = voice.voice_id;
-
-                card.innerHTML = `
-                    <img src="${voice.thumbnail_image_url || 'https://placehold.co/80x80/e2e8f0/64748b?text=??'}" alt="${voice.name}" class="w-20 h-20 rounded-full mb-3 object-cover border-2 border-transparent">
-                    <h3 class="font-bold text-md">${voice.name}</h3>
-                    <p class="text-xs text-gray-500">${voice.gender}, ${voice.age}</p>
-                    <button data-sample-url="${voice.samples?.[0]?.url}" class="mt-2 text-xs bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded-full hover:bg-gray-300 dark:hover:bg-gray-500 transition disabled:opacity-50" ${!voice.samples?.[0]?.url ? 'disabled' : ''}>샘플 듣기</button>
-                `;
-                
-                voiceGrid.appendChild(card);
-
-                card.querySelector('button').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const sampleUrl = e.target.dataset.sampleUrl;
-                    if(sampleUrl) {
-                        if (audioPlayer) audioPlayer.pause();
-                        audioPlayer = new Audio(sampleUrl);
-                        audioPlayer.play();
+                    if (!presetVoicesRes.ok && !customVoicesRes.ok) {
+                        throw new Error('음성 목록을 가져오는 데 실패했습니다. 프록시 서버 설정을 확인하세요.');
                     }
-                });
 
-                card.addEventListener('click', () => {
-                    document.querySelectorAll('.voice-card').forEach(c => {
-                        c.classList.remove('ring-2', 'ring-blue-500');
-                        c.querySelector('img').classList.remove('border-blue-500');
-                    });
-                    card.classList.add('ring-2', 'ring-blue-500');
-                    card.querySelector('img').classList.add('border-blue-500');
-                    selectedVoiceId = voice.voice_id;
-                    updateGenerateButtonState();
-                });
-            });
-        }
-        
-        function updateGenerateButtonState() {
-            generateBtn.disabled = !(selectedVoiceId && textInput.value.trim());
-        }
-
-        // Event Listeners
-        document.querySelectorAll('.filter-group').forEach(group => {
-            group.addEventListener('click', (e) => {
-                if (e.target.classList.contains('filter-btn')) {
-                    const key = group.dataset.filterKey;
-                    const value = e.target.dataset.value;
-
-                    currentFilters[key] = value;
-
-                    group.querySelectorAll('.filter-btn').forEach(btn => {
-                        btn.classList.remove('bg-blue-500', 'text-white');
-                        btn.classList.remove('dark:bg-blue-500');
-                    });
-                    e.target.classList.add('bg-blue-500', 'text-white');
-                    e.target.classList.add('dark:bg-blue-500');
+                    const presetVoices = presetVoicesRes.ok ? await presetVoicesRes.json() : [];
+                    const customVoices = customVoicesRes.ok ? await customVoicesRes.json() : [];
                     
+                    // 중복 제거 (voice_id 기준)
+                    const voiceMap = new Map();
+                    [...presetVoices, ...customVoices].forEach(voice => {
+                        if (voice && voice.voice_id) {
+                            voiceMap.set(voice.voice_id, voice);
+                        }
+                    });
+
+                    allVoices = Array.from(voiceMap.values());
+                    
+                    if (allVoices.length === 0) {
+                         throw new Error('사용 가능한 음성이 없습니다. API Key 또는 프록시 설정을 확인하세요.');
+                    }
+                    
+                    populateFilters();
                     renderVoices();
+                    showLoadingState(false);
+
+                } catch (error) {
+                    console.error('Error fetching voices:', error);
+                    showError(error.message);
                 }
-            });
-        });
+            }
 
-        document.getElementById('name-search').addEventListener('input', (e) => {
-            currentFilters.name = e.target.value;
-            renderVoices();
-        });
+            function showLoadingState(isLoading) {
+                if (isLoading) {
+                    listSpinner.classList.remove('hidden');
+                    voiceListContainer.innerHTML = ''; // 기존 컨텐츠 초기화
+                    voiceListContainer.appendChild(listSpinner);
+                    listError.classList.add('hidden');
+                } else {
+                    listSpinner.classList.add('hidden');
+                }
+            }
+            
+            function showError(message) {
+                listSpinner.classList.add('hidden');
+                listError.textContent = message;
+                listError.classList.remove('hidden');
+            }
 
-        textInput.addEventListener('input', updateGenerateButtonState);
+            // --- 필터 및 렌더링 ---
+            
+            function populateFilters() {
+                const languages = new Set();
+                const styles = new Set();
+                allVoices.forEach(voice => {
+                    if (voice.language) languages.add(voice.language);
+                    if (voice.style) styles.add(voice.style);
+                });
 
-        generateBtn.addEventListener('click', async () => {
-            if (generateBtn.disabled) return;
-            generateLoader.classList.remove('hidden');
-            generateIcon.classList.add('hidden');
-            generateBtnText.textContent = "생성중...";
-            generateBtn.disabled = true;
-            try {
-                await tts(textInput.value, selectedVoiceId);
-            } catch (error) {
-                alert(`음성 생성 실패: ${error.message}`);
-            } finally {
-                generateLoader.classList.add('hidden');
-                generateIcon.classList.remove('hidden');
-                generateBtnText.textContent = "생성하기";
+                languages.forEach(lang => {
+                    const option = document.createElement('option');
+                    option.value = lang;
+                    option.textContent = lang.toUpperCase();
+                    languageFilter.appendChild(option);
+                });
+
+                styles.forEach(style => {
+                    const option = document.createElement('option');
+                    option.value = style;
+                    option.textContent = style.charAt(0).toUpperCase() + style.slice(1);
+                    styleFilter.appendChild(option);
+                });
+            }
+
+            function renderVoices() {
+                voiceListContainer.innerHTML = ''; // 목록 비우기
+
+                const searchTerm = searchInput.value.toLowerCase();
+                const selectedLang = languageFilter.value;
+                const selectedStyle = styleFilter.value;
+
+                const filteredVoices = allVoices.filter(voice => {
+                    const nameMatch = voice.name.toLowerCase().includes(searchTerm);
+                    const langMatch = !selectedLang || voice.language === selectedLang;
+                    const styleMatch = !selectedStyle || voice.style === selectedStyle;
+                    return nameMatch && langMatch && styleMatch;
+                });
+
+                if (filteredVoices.length === 0) {
+                    voiceListContainer.innerHTML = `<p class="col-span-full text-center text-gray-400">조건에 맞는 음성이 없습니다.</p>`;
+                    return;
+                }
+
+                filteredVoices.forEach(voice => {
+                    const card = document.createElement('div');
+                    card.className = 'voice-card bg-gray-800 rounded-lg p-4 flex flex-col justify-between shadow-md';
+                    card.innerHTML = `
+                        <div>
+                            <h3 class="font-bold text-lg truncate">${voice.name}</h3>
+                            <div class="flex flex-wrap gap-2 mt-2 text-xs">
+                                <span class="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full">${voice.language || 'N/A'}</span>
+                                <span class="bg-purple-500/20 text-purple-300 px-2 py-1 rounded-full">${voice.style || 'N/A'}</span>
+                            </div>
+                        </div>
+                        <button data-voice-id="${voice.voice_id}" class="select-voice-btn mt-4 w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-md transition">
+                            선택
+                        </button>
+                    `;
+                    voiceListContainer.appendChild(card);
+                });
+            }
+
+            // --- 이벤트 핸들러 ---
+
+            function handleVoiceSelect(event) {
+                if (!event.target.classList.contains('select-voice-btn')) return;
+                
+                const voiceId = event.target.dataset.voiceId;
+                selectedVoice = allVoices.find(v => v.voice_id === voiceId);
+
+                if (selectedVoice) {
+                    selectedVoiceInfo.innerHTML = `
+                        <span class="font-semibold truncate text-white">${selectedVoice.name}</span>
+                    `;
+                    // 부드러운 스크롤 효과
+                    const ttsSection = document.querySelector('.sticky');
+                    ttsSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
                 updateGenerateButtonState();
             }
-        });
-        
-        // Initial Load
-        window.addEventListener('load', async () => {
-            statusMessage.textContent = '목소리 목록을 불러오는 중...';
-            try {
-                allVoices = await getVoices();
-                loadingState.classList.add('hidden');
-                renderVoices();
-            } catch (error) {
-                loadingState.classList.add('hidden');
-                statusMessage.textContent = `오류: ${error.message}`;
-                statusMessage.classList.add('text-red-600');
+
+            function updateGenerateButtonState() {
+                const hasText = ttsText.value.trim().length > 0;
+                const hasVoice = !!selectedVoice;
+                generateButton.disabled = !hasText || !hasVoice;
             }
+            
+            async function handleTTSGeneration() {
+                if (!selectedVoice || !ttsText.value.trim()) return;
+
+                const text = ttsText.value.trim();
+                if (text.length > 300) {
+                    alert('텍스트는 300자를 초과할 수 없습니다.');
+                    return;
+                }
+                
+                setGeneratingState(true);
+
+                try {
+                    // Vercel 프록시 서버의 /api/tts/{voiceId} 엔드포인트를 호출합니다.
+                    const response = await fetch(`/api/tts/${selectedVoice.voice_id}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            text: text,
+                            language: selectedVoice.language,
+                            style: selectedVoice.style,
+                            model: selectedVoice.model || 'sona_speech_1', // 기본 모델 설정
+                            output_format: 'mp3'
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({ message: '알 수 없는 오류가 발생했습니다.' }));
+                        throw new Error(`[${response.status}] ${errorData.message || '오디오 생성에 실패했습니다.'}`);
+                    }
+
+                    const blob = await response.blob();
+                    const audioUrl = URL.createObjectURL(blob);
+                    audioPlayer.src = audioUrl;
+                    audioPlayer.play();
+
+                } catch (error) {
+                    console.error('TTS Error:', error);
+                    alert(`오류가 발생했습니다: ${error.message}`);
+                } finally {
+                    setGeneratingState(false);
+                }
+            }
+            
+            function setGeneratingState(isGenerating) {
+                generateButton.disabled = isGenerating;
+                if (isGenerating) {
+                    generateButtonText.classList.add('hidden');
+                    generateSpinner.classList.remove('hidden');
+                } else {
+                    generateButtonText.classList.remove('hidden');
+                    generateSpinner.classList.add('hidden');
+                    updateGenerateButtonState(); // 완료 후 버튼 상태 다시 업데이트
+                }
+            }
+
+            // --- 이벤트 리스너 등록 ---
+            searchInput.addEventListener('input', renderVoices);
+            languageFilter.addEventListener('change', renderVoices);
+            styleFilter.addEventListener('change', renderVoices);
+            voiceListContainer.addEventListener('click', handleVoiceSelect);
+            generateButton.addEventListener('click', handleTTSGeneration);
+            ttsText.addEventListener('input', updateGenerateButtonState);
+            
+            // --- 앱 시작 ---
+            fetchVoices();
+            updateGenerateButtonState(); // 초기 버튼 상태 설정
         });
     </script>
 </body>
 </html>
-
