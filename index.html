@@ -90,7 +90,7 @@
                 <!-- 로딩 스피너 -->
                 <div id="list-spinner" class="col-span-full flex flex-col justify-center items-center h-64">
                     <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
-                    <p class="mt-4 text-gray-400">전체 목소리를 불러오는 중입니다...</p>
+                    <p class="mt-4 text-gray-400">기본 프리셋 음성 목록을 불러오는 중입니다...</p>
                 </div>
                 <!-- 에러 메시지 -->
                 <div id="list-error" class="hidden col-span-full text-center text-red-400 bg-red-900/50 p-4 rounded-md"></div>
@@ -132,15 +132,13 @@
                     const url = nextCursor ? `${endpoint}?cursor=${nextCursor}` : endpoint;
                     const response = await fetch(url);
 
-                    // [개선됨] 응답이 실패했을 때 더 자세한 오류 메시지를 생성합니다.
                     if (!response.ok) {
                         const errorData = await response.json().catch(() => ({}));
                         const message = errorData.message || response.statusText;
-                        throw new Error(`목록을 불러오지 못했습니다 (${response.status} from ${endpoint}): ${message}. Vercel 환경변수(SUPERTONE_API_KEY)를 확인하세요.`);
+                        throw new Error(`목록을 불러오지 못했습니다 (${response.status} from ${endpoint}). Vercel 환경변수(SUPERTONE_API_KEY)를 확인하세요.`);
                     }
 
                     const data = await response.json();
-                    
                     const pageVoices = data.voices || (Array.isArray(data) ? data : []);
                     voices.push(...pageVoices);
 
@@ -156,13 +154,11 @@
             async function fetchVoices() {
                 showLoadingState(true);
                 try {
-                    const [presetVoices, customVoices] = await Promise.all([
-                        fetchAllPaginatedVoices('/api/voices').catch(e => { console.error("Error fetching preset voices:", e); throw e; }),
-                        fetchAllPaginatedVoices('/api/custom-voices').catch(e => { console.error("Error fetching custom voices:", e); return []; }) // Custom은 실패해도 무시
-                    ]);
+                    // [수정] 사용자 정의 음성 호출을 제거하고 기본 프리셋 음성만 가져옵니다.
+                    const presetVoices = await fetchAllPaginatedVoices('/api/voices');
 
                     const voiceMap = new Map();
-                    [...presetVoices, ...customVoices].forEach(voice => {
+                    presetVoices.forEach(voice => {
                         if (voice && voice.voice_id) {
                             voiceMap.set(voice.voice_id, voice);
                         }
@@ -171,7 +167,8 @@
                     allVoices = Array.from(voiceMap.values());
                     
                     if (allVoices.length === 0) {
-                         throw new Error('사용 가능한 음성이 없습니다. API 응답이 비어있습니다.');
+                         // [수정] 오류 메시지를 더 구체적으로 변경합니다.
+                         throw new Error('프리셋 음성 목록을 가져왔지만 비어있습니다. Supertone 계정의 API 요금제 또는 권한을 확인해주세요.');
                     }
                     
                     populateFilters();
@@ -180,7 +177,11 @@
 
                 } catch (error) {
                     console.error('Final Error fetching voices:', error);
-                    showError(error.message); // [개선됨] 에러 메시지를 화면에 직접 표시
+                    // [수정] catch 블록에서 표시되는 오류 메시지에 계정 확인 안내를 추가합니다.
+                    const finalMessage = error.message.includes('Vercel') 
+                        ? error.message 
+                        : `${error.message} 문제가 지속되면 Supertone 계정의 API 요금제 및 권한을 확인해주세요.`;
+                    showError(finalMessage);
                 }
             }
             
@@ -231,7 +232,6 @@
 
             function renderVoices() {
                 voiceListContainer.innerHTML = '';
-
                 const searchTerm = searchInput.value.toLowerCase();
                 const selectedLang = languageFilter.value;
                 const selectedStyle = styleFilter.value;
@@ -305,14 +305,13 @@
             
             async function handleTTSGeneration() {
                 if (!selectedVoice || !ttsText.value.trim()) return;
-
                 const text = ttsText.value.trim();
                 if (text.length > 300) {
                     alert('텍스트는 300자를 초과할 수 없습니다.');
                     return;
                 }
-                
                 setGeneratingState(true);
+                // ... (rest of the function is identical)
                 audioPlayer.classList.add('hidden');
                 downloadContainer.classList.add('hidden');
 
