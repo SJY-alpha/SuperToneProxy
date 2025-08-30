@@ -6,21 +6,13 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).send("Method Not Allowed");
 
   try {
-    const upstream = await fetch("https://api.supertone.ai/v1/voices", {
-      method: "GET",
-      headers: {
-        "x-sup-api-key": process.env.SUPERTONE_API_KEY
-      }
+    const upstream = await fetch("https://api.supertoneapi.com/v1/voices", {
+      headers: { "x-sup-api-key": process.env.SUPERTONE_API_KEY }
     });
-
-    if (!upstream.ok) {
-      const errTxt = await upstream.text();
-      return res.status(upstream.status).send(errTxt);
-    }
-
-    const data = await upstream.json();
-    return res.status(200).json(data);
+    if (!upstream.ok) return res.status(upstream.status).send(await upstream.text());
+    return res.status(200).json(await upstream.json());
   } catch (e) {
-    return res.status(500).send(String(e));
+    console.error("voices proxy error:", e);
+    return res.status(500).send("proxy fetch failed");
   }
 }
