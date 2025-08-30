@@ -123,8 +123,6 @@
             let audioBlobUrl = null;
 
             // --- Data Loading and Initialization ---
-
-            // Helper function to handle pagination and fetch all voices from an endpoint
             async function fetchAllPaginatedVoices(endpoint) {
                 let voices = [];
                 let nextCursor = null;
@@ -134,9 +132,11 @@
                     const url = nextCursor ? `${endpoint}?cursor=${nextCursor}` : endpoint;
                     const response = await fetch(url);
 
+                    // [개선됨] 응답이 실패했을 때 더 자세한 오류 메시지를 생성합니다.
                     if (!response.ok) {
                         const errorData = await response.json().catch(() => ({}));
-                        throw new Error(`Failed to fetch from ${endpoint}: ${errorData.message || response.statusText}`);
+                        const message = errorData.message || response.statusText;
+                        throw new Error(`목록을 불러오지 못했습니다 (${response.status} from ${endpoint}): ${message}. Vercel 환경변수(SUPERTONE_API_KEY)를 확인하세요.`);
                     }
 
                     const data = await response.json();
@@ -152,14 +152,13 @@
                 }
                 return voices;
             }
-
-            // Main function to fetch all voices from both preset and custom endpoints
+            
             async function fetchVoices() {
                 showLoadingState(true);
                 try {
                     const [presetVoices, customVoices] = await Promise.all([
-                        fetchAllPaginatedVoices('/api/voices').catch(e => { console.error("Error fetching preset voices:", e); return []; }),
-                        fetchAllPaginatedVoices('/api/custom-voices').catch(e => { console.error("Error fetching custom voices:", e); return []; })
+                        fetchAllPaginatedVoices('/api/voices').catch(e => { console.error("Error fetching preset voices:", e); throw e; }),
+                        fetchAllPaginatedVoices('/api/custom-voices').catch(e => { console.error("Error fetching custom voices:", e); return []; }) // Custom은 실패해도 무시
                     ]);
 
                     const voiceMap = new Map();
@@ -172,7 +171,7 @@
                     allVoices = Array.from(voiceMap.values());
                     
                     if (allVoices.length === 0) {
-                         throw new Error('사용 가능한 음성이 없습니다. API Key 또는 Vercel 프록시 설정을 확인하세요.');
+                         throw new Error('사용 가능한 음성이 없습니다. API 응답이 비어있습니다.');
                     }
                     
                     populateFilters();
@@ -180,32 +179,29 @@
                     showLoadingState(false);
 
                 } catch (error) {
-                    console.error('Error fetching voices:', error);
-                    showError(error.message);
+                    console.error('Final Error fetching voices:', error);
+                    showError(error.message); // [개선됨] 에러 메시지를 화면에 직접 표시
                 }
             }
             
             function showLoadingState(isLoading) {
+                listSpinner.style.display = isLoading ? 'flex' : 'none';
+                listError.classList.add('hidden');
                 if (isLoading) {
-                    listSpinner.classList.remove('hidden');
-                    listSpinner.classList.add('flex');
                     voiceListContainer.innerHTML = '';
                     voiceListContainer.appendChild(listSpinner);
-                    listError.classList.add('hidden');
-                } else {
-                    listSpinner.classList.add('hidden');
-                    listSpinner.classList.remove('flex');
                 }
             }
             
             function showError(message) {
-                listSpinner.classList.add('hidden');
-                listSpinner.classList.remove('flex');
-                listError.textContent = `Error: ${message}`;
+                listSpinner.style.display = 'none';
+                listError.innerHTML = `<p class="font-bold">오류 발생:</p><p class="mt-2 text-sm">${message}</p>`;
                 listError.classList.remove('hidden');
+                voiceListContainer.innerHTML = '';
+                voiceListContainer.appendChild(listError);
             }
 
-            // --- Filtering and Rendering ---
+            // --- Filtering and Rendering (이하 동일) ---
             
             function populateFilters() {
                 const languages = new Set();
@@ -215,7 +211,7 @@
                     if (voice.style) styles.add(voice.style);
                 });
 
-                languageFilter.length = 1; // Reset options except 'All'
+                languageFilter.length = 1; 
                 styleFilter.length = 1;
 
                 Array.from(languages).sort().forEach(lang => {
@@ -282,7 +278,7 @@
                 });
             }
 
-            // --- Event Handlers ---
+            // --- Event Handlers (이하 동일) ---
             function handleVoiceSelect(event) {
                 const card = event.target.closest('.voice-card');
                 if (!card) return;
