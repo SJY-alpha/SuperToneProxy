@@ -25,11 +25,15 @@
             background: #718096;
         }
         .voice-card {
-            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, outline 0.2s ease-in-out;
         }
         .voice-card:hover {
             transform: translateY(-4px);
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .voice-card.selected {
+            outline: 2px solid #3b82f6;
+            transform: translateY(-2px);
         }
     </style>
 </head>
@@ -58,12 +62,18 @@
                     </button>
                 </div>
             </div>
-            <audio id="audio-player" controls class="w-full mt-4"></audio>
+            <audio id="audio-player" controls class="w-full mt-4 hidden"></audio>
+            <div id="audio-download-container" class="mt-2 text-center hidden">
+                <a id="download-link" class="text-blue-400 hover:text-blue-300 text-sm">오디오 파일 다운로드</a>
+            </div>
         </div>
 
         <!-- 음성 목록 및 필터 -->
         <div>
-            <h2 class="text-2xl font-semibold mb-4">Voice List</h2>
+            <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                 <h2 class="text-2xl font-semibold">Voice List</h2>
+                 <div id="voice-count" class="text-gray-400 text-right"></div>
+            </div>
             <!-- 필터 -->
             <div class="flex flex-wrap gap-4 mb-6">
                 <input type="text" id="search-input" placeholder="이름으로 검색..." class="flex-grow bg-gray-800 p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]">
@@ -78,8 +88,9 @@
             <!-- 음성 목록 -->
             <div id="voice-list-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 <!-- 로딩 스피너 -->
-                <div id="list-spinner" class="col-span-full flex justify-center items-center h-64">
+                <div id="list-spinner" class="col-span-full flex flex-col justify-center items-center h-64">
                     <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
+                    <p class="mt-4 text-gray-400">전체 목소리를 불러오는 중입니다...</p>
                 </div>
                 <!-- 에러 메시지 -->
                 <div id="list-error" class="hidden col-span-full text-center text-red-400 bg-red-900/50 p-4 rounded-md"></div>
@@ -89,12 +100,14 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // UI 요소
+            // UI Elements
             const ttsText = document.getElementById('tts-text');
             const generateButton = document.getElementById('generate-button');
             const generateButtonText = document.getElementById('generate-button-text');
             const generateSpinner = document.getElementById('generate-spinner');
             const audioPlayer = document.getElementById('audio-player');
+            const downloadContainer = document.getElementById('audio-download-container');
+            const downloadLink = document.getElementById('download-link');
             const selectedVoiceInfo = document.getElementById('selected-voice-info');
             const searchInput = document.getElementById('search-input');
             const languageFilter = document.getElementById('language-filter');
@@ -102,32 +115,53 @@
             const voiceListContainer = document.getElementById('voice-list-container');
             const listSpinner = document.getElementById('list-spinner');
             const listError = document.getElementById('list-error');
+            const voiceCount = document.getElementById('voice-count');
 
-            // 상태 관리
+            // State Management
             let allVoices = [];
             let selectedVoice = null;
+            let audioBlobUrl = null;
 
-            // --- 데이터 로딩 및 초기화 ---
+            // --- Data Loading and Initialization ---
 
+            // Helper function to handle pagination and fetch all voices from an endpoint
+            async function fetchAllPaginatedVoices(endpoint) {
+                let voices = [];
+                let nextCursor = null;
+                let hasNextPage = true;
+
+                while (hasNextPage) {
+                    const url = nextCursor ? `${endpoint}?cursor=${nextCursor}` : endpoint;
+                    const response = await fetch(url);
+
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(`Failed to fetch from ${endpoint}: ${errorData.message || response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    
+                    const pageVoices = data.voices || (Array.isArray(data) ? data : []);
+                    voices.push(...pageVoices);
+
+                    if (data.next_cursor) {
+                        nextCursor = data.next_cursor;
+                    } else {
+                        hasNextPage = false;
+                    }
+                }
+                return voices;
+            }
+
+            // Main function to fetch all voices from both preset and custom endpoints
             async function fetchVoices() {
                 showLoadingState(true);
                 try {
-                    // 제공된 매뉴얼에 따라, 2025-08-31 이후 사용자 음성은 /v1/custom-voices 로 분리됩니다.
-                    // 따라서 두 엔드포인트를 모두 호출하여 목소리 목록을 합칩니다.
-                    // 실제 배포 시에는 Vercel에 /api/voices 와 /api/custom-voices 프록시 함수를 만들어야 합니다.
-                    const [presetVoicesRes, customVoicesRes] = await Promise.all([
-                        fetch('/api/voices').catch(e => ({ ok: false, status: e.toString() })),
-                        fetch('/api/custom-voices').catch(e => ({ ok: false, status: e.toString() }))
+                    const [presetVoices, customVoices] = await Promise.all([
+                        fetchAllPaginatedVoices('/api/voices').catch(e => { console.error("Error fetching preset voices:", e); return []; }),
+                        fetchAllPaginatedVoices('/api/custom-voices').catch(e => { console.error("Error fetching custom voices:", e); return []; })
                     ]);
 
-                    if (!presetVoicesRes.ok && !customVoicesRes.ok) {
-                        throw new Error('음성 목록을 가져오는 데 실패했습니다. 프록시 서버 설정을 확인하세요.');
-                    }
-
-                    const presetVoices = presetVoicesRes.ok ? await presetVoicesRes.json() : [];
-                    const customVoices = customVoicesRes.ok ? await customVoicesRes.json() : [];
-                    
-                    // 중복 제거 (voice_id 기준)
                     const voiceMap = new Map();
                     [...presetVoices, ...customVoices].forEach(voice => {
                         if (voice && voice.voice_id) {
@@ -138,7 +172,7 @@
                     allVoices = Array.from(voiceMap.values());
                     
                     if (allVoices.length === 0) {
-                         throw new Error('사용 가능한 음성이 없습니다. API Key 또는 프록시 설정을 확인하세요.');
+                         throw new Error('사용 가능한 음성이 없습니다. API Key 또는 Vercel 프록시 설정을 확인하세요.');
                     }
                     
                     populateFilters();
@@ -150,25 +184,28 @@
                     showError(error.message);
                 }
             }
-
+            
             function showLoadingState(isLoading) {
                 if (isLoading) {
                     listSpinner.classList.remove('hidden');
-                    voiceListContainer.innerHTML = ''; // 기존 컨텐츠 초기화
+                    listSpinner.classList.add('flex');
+                    voiceListContainer.innerHTML = '';
                     voiceListContainer.appendChild(listSpinner);
                     listError.classList.add('hidden');
                 } else {
                     listSpinner.classList.add('hidden');
+                    listSpinner.classList.remove('flex');
                 }
             }
             
             function showError(message) {
                 listSpinner.classList.add('hidden');
-                listError.textContent = message;
+                listSpinner.classList.remove('flex');
+                listError.textContent = `Error: ${message}`;
                 listError.classList.remove('hidden');
             }
 
-            // --- 필터 및 렌더링 ---
+            // --- Filtering and Rendering ---
             
             function populateFilters() {
                 const languages = new Set();
@@ -178,14 +215,17 @@
                     if (voice.style) styles.add(voice.style);
                 });
 
-                languages.forEach(lang => {
+                languageFilter.length = 1; // Reset options except 'All'
+                styleFilter.length = 1;
+
+                Array.from(languages).sort().forEach(lang => {
                     const option = document.createElement('option');
                     option.value = lang;
                     option.textContent = lang.toUpperCase();
                     languageFilter.appendChild(option);
                 });
 
-                styles.forEach(style => {
+                Array.from(styles).sort().forEach(style => {
                     const option = document.createElement('option');
                     option.value = style;
                     option.textContent = style.charAt(0).toUpperCase() + style.slice(1);
@@ -194,7 +234,7 @@
             }
 
             function renderVoices() {
-                voiceListContainer.innerHTML = ''; // 목록 비우기
+                voiceListContainer.innerHTML = '';
 
                 const searchTerm = searchInput.value.toLowerCase();
                 const selectedLang = languageFilter.value;
@@ -206,6 +246,8 @@
                     const styleMatch = !selectedStyle || voice.style === selectedStyle;
                     return nameMatch && langMatch && styleMatch;
                 });
+                
+                voiceCount.textContent = `Showing ${filteredVoices.length} of ${allVoices.length} voices`;
 
                 if (filteredVoices.length === 0) {
                     voiceListContainer.innerHTML = `<p class="col-span-full text-center text-gray-400">조건에 맞는 음성이 없습니다.</p>`;
@@ -214,40 +256,49 @@
 
                 filteredVoices.forEach(voice => {
                     const card = document.createElement('div');
-                    card.className = 'voice-card bg-gray-800 rounded-lg p-4 flex flex-col justify-between shadow-md';
+                    card.className = 'voice-card bg-gray-800 rounded-lg p-4 flex flex-col justify-between shadow-md cursor-pointer';
+                    card.dataset.voiceId = voice.voice_id;
                     card.innerHTML = `
                         <div>
-                            <h3 class="font-bold text-lg truncate">${voice.name}</h3>
-                            <div class="flex flex-wrap gap-2 mt-2 text-xs">
+                            <h3 class="font-bold text-lg truncate pointer-events-none">${voice.name}</h3>
+                            <div class="flex flex-wrap gap-2 mt-2 text-xs pointer-events-none">
                                 <span class="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full">${voice.language || 'N/A'}</span>
                                 <span class="bg-purple-500/20 text-purple-300 px-2 py-1 rounded-full">${voice.style || 'N/A'}</span>
                             </div>
                         </div>
-                        <button data-voice-id="${voice.voice_id}" class="select-voice-btn mt-4 w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-md transition">
-                            선택
-                        </button>
+                        <div class="select-indicator mt-4 text-center text-white font-semibold py-2 px-4 rounded-md transition pointer-events-none"></div>
                     `;
+                    
+                    const selectIndicator = card.querySelector('.select-indicator');
+                    if (selectedVoice && selectedVoice.voice_id === voice.voice_id) {
+                        card.classList.add('selected');
+                        selectIndicator.textContent = '선택됨';
+                        selectIndicator.classList.add('bg-blue-600');
+                    } else {
+                         selectIndicator.textContent = '선택하기';
+                         selectIndicator.classList.add('bg-gray-700');
+                    }
                     voiceListContainer.appendChild(card);
                 });
             }
 
-            // --- 이벤트 핸들러 ---
-
+            // --- Event Handlers ---
             function handleVoiceSelect(event) {
-                if (!event.target.classList.contains('select-voice-btn')) return;
+                const card = event.target.closest('.voice-card');
+                if (!card) return;
                 
-                const voiceId = event.target.dataset.voiceId;
+                const voiceId = card.dataset.voiceId;
                 selectedVoice = allVoices.find(v => v.voice_id === voiceId);
 
                 if (selectedVoice) {
-                    selectedVoiceInfo.innerHTML = `
-                        <span class="font-semibold truncate text-white">${selectedVoice.name}</span>
-                    `;
-                    // 부드러운 스크롤 효과
+                    selectedVoiceInfo.innerHTML = `<span class="font-semibold truncate text-white">${selectedVoice.name}</span>`;
                     const ttsSection = document.querySelector('.sticky');
-                    ttsSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    if(window.scrollY > ttsSection.offsetTop) {
+                        ttsSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
                 }
                 updateGenerateButtonState();
+                renderVoices();
             }
 
             function updateGenerateButtonState() {
@@ -266,19 +317,18 @@
                 }
                 
                 setGeneratingState(true);
+                audioPlayer.classList.add('hidden');
+                downloadContainer.classList.add('hidden');
 
                 try {
-                    // Vercel 프록시 서버의 /api/tts/{voiceId} 엔드포인트를 호출합니다.
                     const response = await fetch(`/api/tts/${selectedVoice.voice_id}`, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             text: text,
                             language: selectedVoice.language,
                             style: selectedVoice.style,
-                            model: selectedVoice.model || 'sona_speech_1', // 기본 모델 설정
+                            model: selectedVoice.model || 'sona_speech_1',
                             output_format: 'mp3'
                         })
                     });
@@ -289,9 +339,19 @@
                     }
 
                     const blob = await response.blob();
-                    const audioUrl = URL.createObjectURL(blob);
-                    audioPlayer.src = audioUrl;
+
+                    if (audioBlobUrl) {
+                        URL.revokeObjectURL(audioBlobUrl);
+                    }
+
+                    audioBlobUrl = URL.createObjectURL(blob);
+                    audioPlayer.src = audioBlobUrl;
+                    audioPlayer.classList.remove('hidden');
                     audioPlayer.play();
+
+                    downloadLink.href = audioBlobUrl;
+                    downloadLink.download = `${selectedVoice.name}_${text.substring(0, 10).replace(/\s/g, '_')}.mp3`;
+                    downloadContainer.classList.remove('hidden');
 
                 } catch (error) {
                     console.error('TTS Error:', error);
@@ -309,11 +369,11 @@
                 } else {
                     generateButtonText.classList.remove('hidden');
                     generateSpinner.classList.add('hidden');
-                    updateGenerateButtonState(); // 완료 후 버튼 상태 다시 업데이트
+                    updateGenerateButtonState();
                 }
             }
 
-            // --- 이벤트 리스너 등록 ---
+            // --- Event Listeners ---
             searchInput.addEventListener('input', renderVoices);
             languageFilter.addEventListener('change', renderVoices);
             styleFilter.addEventListener('change', renderVoices);
@@ -321,10 +381,11 @@
             generateButton.addEventListener('click', handleTTSGeneration);
             ttsText.addEventListener('input', updateGenerateButtonState);
             
-            // --- 앱 시작 ---
+            // --- App Start ---
             fetchVoices();
-            updateGenerateButtonState(); // 초기 버튼 상태 설정
+            updateGenerateButtonState();
         });
     </script>
 </body>
 </html>
+
