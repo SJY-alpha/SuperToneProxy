@@ -1,40 +1,33 @@
-// Node.js Serverless Function
 export default async function handler(req, res) {
-  // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(204).end();
-
   if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
 
   try {
-    const { text, voice } = req.body || {};
-    if (!text || !voice) return res.status(400).send("text and voice required");
+    const { text, voice_id, language="ko", style="neutral", model="sona_speech_1" } = req.body || {};
+    if (!text || !voice_id) return res.status(400).send("text and voice_id required");
 
-    const apiKey = process.env.SUPERTONE_API_KEY;
-    if (!apiKey) return res.status(500).send("SUPERTONE_API_KEY missing");
-
-    // 예: Supertone TTS API 엔드포인트 가정
-    const upstream = await fetch("https://api.supertone.ai/v1/tts", {
+    const resp = await fetch(`https://api.supertoneapi.com/v1/text-to-speech/${voice_id}`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        "x-sup-api-key": process.env.SUPERTONE_API_KEY,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        text,
-        voice_id: voice,   // 필요에 맞게 필드명 조정
-        format: "mp3"
-      })
+      body: JSON.stringify({ text, language, style, model })
     });
 
-    if (!upstream.ok) {
-      const errTxt = await upstream.text();
-      return res.status(upstream.status).send(errTxt);
-    }
-
-    const arrayBuf = await upstream.arrayBuffer();
+    if (!resp.ok) return res.status(resp.status).send(await resp.text());
+    const buf = Buffer.from(await resp.arrayBuffer());
+    res.setHeader("Content-Type", "audio/wav");
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(200).send(buf);
+  } catch (e) {
+    console.error("tts proxy error:", e);
+    return res.status(500).send("proxy fetch failed");
+  }
+}    const arrayBuf = await upstream.arrayBuffer();
     res.setHeader("Content-Type", "audio/mpeg");
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).send(Buffer.from(arrayBuf));
